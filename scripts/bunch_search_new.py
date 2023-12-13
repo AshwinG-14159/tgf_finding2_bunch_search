@@ -53,7 +53,7 @@ path_to_orbitinfo = '../data/orbitinfo.csv'
 
 
 gap = 1
-total_attempts = 100
+total_attempts = 1000
 version = 4
 set_of_rows = []
 
@@ -100,6 +100,12 @@ num_quads = 3
 total_thresh = 1600
 reg_around_peak = [0.1,10]
 
+plot_stuff = False
+
+count_orbits = 0
+count_events_total = 0
+count_events_with_mkf = 0
+
 start_text2 = f"""parameters: binning={binning}, individual quadrant threshold = {ind_quad_thres}, num quads = {num_quads}, 
       regions to plot for = {reg_around_peak}, type = {my_type}"""
 log(start_text2)
@@ -113,21 +119,27 @@ writer = csv.writer(csv_file)
 
 
 for row in set_of_rows:
+    mkf_present = True
     row_data = row[0].split('_')
     date = row_data[0]
     orbit = row_data[-1]
 
     bunch_files = glob.glob(f'{path_data}/*{orbit}{pattern_bunch}')
     veto_files = glob.glob(f'{path_data}/*{orbit}{pattern_veto}')
-    mkf = glob.glob(f'{path_mkfs}/*{orbit}{pattern_mkf}')[0]
+    mkf_files = glob.glob(f'{path_mkfs}/*{orbit}{pattern_mkf}')
+    if(mkf_files==[]):
+        log(f"{date}, {orbit} mkf missing")
+        mkf_present=False
+    else:
+        mkf = mkf_files[0]
 
     if(bunch_files==[] or veto_files == []):
         log(f"{date}, {orbit} bunch or veto missing")
         continue
     
-    if(orbit[:4]!='4187'):
-        continue
-
+    # if(orbit[:3]!='418'):
+    #     continue
+    count_orbits+=1
     print(f"trying for {date} {orbit}")
     log(f"trying for {date} {orbit}. {bunch_files[0]} {veto_files[0]} will be used")
 
@@ -272,107 +284,113 @@ for row in set_of_rows:
                 log(f"will be plotted")
 
                 if not written_to_csv:
-                    czti_time = timestamp
-                    with fits.open(mkf) as hdul:
-                        h = hdul[0].header
-                        ra_pnt = f'{h["RA_PNT"]}d'
-                        dec_pnt = f'{h["DEC_PNT"]}d'
-                
-                    try:
-                        ra_pnt = coo.Angle(ra_pnt)
-                    except u.UnitsError:
-                        ra_pnt = coo.Angle(ra_pnt, unit=u.deg)
-
-                    try:
-                        dec_pnt = coo.Angle(dec_pnt)
-                    except u.UnitsError:
-                        dec_pnt = coo.Angle(dec_pnt, unit=u.deg)
-
-
-                    transient_theta, transient_phi, transient_thetax, transient_thetay, coo_x, coo_y, coo_z, coo_transient, earth, earth_czti, earth_transient, earth_occult_angle, phi_newn = angles.txy(mkf, czti_time, ra_pnt.deg, dec_pnt.deg)
+                    count_events_total+=1
+                    if(not mkf_present):
+                        row_to_write = [date, orbit, timestamp, -1, -1]
+                        writer.writerow(row_to_write)
+                        csv_file.flush()
+                    else:
+                        count_events_with_mkf+=1
+                        czti_time = timestamp
+                        with fits.open(mkf) as hdul:
+                            h = hdul[0].header
+                            ra_pnt = f'{h["RA_PNT"]}d'
+                            dec_pnt = f'{h["DEC_PNT"]}d'
                     
-                    row_to_write = [date, orbit, timestamp, earth_transient, phi_newn]
-                    writer.writerow(row_to_write)
-                    csv_file.flush()
+                        try:
+                            ra_pnt = coo.Angle(ra_pnt)
+                        except u.UnitsError:
+                            ra_pnt = coo.Angle(ra_pnt, unit=u.deg)
+
+                        try:
+                            dec_pnt = coo.Angle(dec_pnt)
+                        except u.UnitsError:
+                            dec_pnt = coo.Angle(dec_pnt, unit=u.deg)
+
+                        transient_theta, transient_phi, transient_thetax, transient_thetay, coo_x, coo_y, coo_z, coo_transient, earth, earth_czti, earth_transient, earth_occult_angle, phi_newn = angles.txy(mkf, czti_time, ra_pnt.deg, dec_pnt.deg)
+                        
+                        row_to_write = [date, orbit, timestamp, earth_transient, phi_newn]
+                        writer.writerow(row_to_write)
+                        csv_file.flush()
 
 
-                
-                fig, axarr = plt.subplots(5, sharex=True, figsize=(7, 9))
-                fig.subplots_adjust(hspace=0.5)
+                if(plot_stuff):
+                    fig, axarr = plt.subplots(5, sharex=True, figsize=(7, 9))
+                    fig.subplots_adjust(hspace=0.5)
 
-                axarr[4].plot(t1_vetox, v1x, label='A', drawstyle='steps')
-                axarr[4].plot(t2_vetox, v2x, label='B', drawstyle='steps')
-                axarr[4].plot(t3_vetox, v3x, label='C', drawstyle='steps')
-                axarr[4].plot(t4_vetox, v4x, label='D', drawstyle='steps')
-                axarr[4].set_title('Veto')
-                axarr[4].grid(True)
-                axarr[4].set_ylabel(f'Veto Counts')
-                axarr[4].legend()
-
-
-
-                axarr[0].plot(timesx, a1x)
-                axarr[0].set_title('quad A')
-                axarr[0].set_xlim(timestamp-reg, timestamp+reg)
-                axarr[0].grid(True)
-                axarr[0].set_ylabel(f'Bunch Counts')
-                axarr[0].axhline(y=ind_quad_thres, color='r', linestyle='--', label='cutoff', alpha=0.5)
-
-                axarr[1].plot(timesx, a2x)
-                axarr[1].set_title('quad B')
-                axarr[1].grid(True)
-                axarr[1].set_ylabel(f'Bunch Counts')
-                axarr[1].axhline(y=ind_quad_thres, color='r', linestyle='--', label='cutoff', alpha=0.5)
-
-                axarr[2].plot(timesx, a3x)
-                axarr[2].set_title('quad C')
-                axarr[2].grid(True)
-                axarr[2].set_ylabel(f'Bunch Counts')
-                axarr[2].axhline(y=ind_quad_thres, color='r', linestyle='--', label='cutoff', alpha=0.5)
-
-                axarr[3].plot(timesx, a4x)
-                axarr[3].set_title('quad D')
-                axarr[3].grid(True)
-                axarr[3].set_ylabel(f'Bunch Counts')
-                axarr[3].axhline(y=ind_quad_thres, color='r', linestyle='--', label='cutoff', alpha=0.5)
-
-                plt.xlabel(f'Time(Binning = {binning})')
-                plt.suptitle(f"Bunch and Veto Quads - Eyeballed Veto - Orbit {orbit}")
+                    axarr[4].plot(t1_vetox, v1x, label='A', drawstyle='steps')
+                    axarr[4].plot(t2_vetox, v2x, label='B', drawstyle='steps')
+                    axarr[4].plot(t3_vetox, v3x, label='C', drawstyle='steps')
+                    axarr[4].plot(t4_vetox, v4x, label='D', drawstyle='steps')
+                    axarr[4].set_title('Veto')
+                    axarr[4].grid(True)
+                    axarr[4].set_ylabel(f'Veto Counts')
+                    axarr[4].legend()
 
 
-                plt.savefig(f'{path_plots}/{file_suffix}/{row[0][-5:]}_{binning}_{timestamp}_{reg}_{ind_quad_thres}_quads.png')
 
-                plt.cla()
+                    axarr[0].plot(timesx, a1x)
+                    axarr[0].set_title('quad A')
+                    axarr[0].set_xlim(timestamp-reg, timestamp+reg)
+                    axarr[0].grid(True)
+                    axarr[0].set_ylabel(f'Bunch Counts')
+                    axarr[0].axhline(y=ind_quad_thres, color='r', linestyle='--', label='cutoff', alpha=0.5)
 
-                fig, axarr = plt.subplots(2, sharex=True, figsize=(7, 9))
-                fig.subplots_adjust(hspace=0.5)
+                    axarr[1].plot(timesx, a2x)
+                    axarr[1].set_title('quad B')
+                    axarr[1].grid(True)
+                    axarr[1].set_ylabel(f'Bunch Counts')
+                    axarr[1].axhline(y=ind_quad_thres, color='r', linestyle='--', label='cutoff', alpha=0.5)
 
-                axarr[0].plot(t1_vetox, v1x, label='A', drawstyle='steps')
-                axarr[0].plot(t2_vetox, v2x, label='B', drawstyle='steps')
-                axarr[0].plot(t3_vetox, v3x, label='C', drawstyle='steps')
-                axarr[0].plot(t4_vetox, v4x, label='D', drawstyle='steps')
-                axarr[0].set_title('Veto')
-                axarr[0].grid(True)
-                axarr[0].set_ylabel(f'Veto Counts')
-                axarr[0].legend()
+                    axarr[2].plot(timesx, a3x)
+                    axarr[2].set_title('quad C')
+                    axarr[2].grid(True)
+                    axarr[2].set_ylabel(f'Bunch Counts')
+                    axarr[2].axhline(y=ind_quad_thres, color='r', linestyle='--', label='cutoff', alpha=0.5)
 
-                a_sum = np.sum(np.array([a1x,a2x,a3x,a4x]), axis=0)
+                    axarr[3].plot(timesx, a4x)
+                    axarr[3].set_title('quad D')
+                    axarr[3].grid(True)
+                    axarr[3].set_ylabel(f'Bunch Counts')
+                    axarr[3].axhline(y=ind_quad_thres, color='r', linestyle='--', label='cutoff', alpha=0.5)
 
-
-                axarr[1].plot(timesx, a_sum)
-                axarr[1].set_title('4 Quadrant Summed Bunch Data')
-                axarr[1].set_ylabel(f'Bunch Counts')
-                axarr[1].set_xlim(timestamp-reg, timestamp+reg)
-                axarr[1].grid(True)
-
-                plt.xlabel(f'Time(Binning = {binning})')
-                plt.suptitle(f"4 quadrant Summed Bunch Data and Veto Quads Eyeballed Veto - Orbit {orbit}")
+                    plt.xlabel(f'Time(Binning = {binning})')
+                    plt.suptitle(f"Bunch and Veto Quads - Eyeballed Veto - Orbit {orbit}")
 
 
-                plt.savefig(f'{path_plots}/{file_suffix}/{row[0][-5:]}_{binning}_{timestamp}_{reg}_{ind_quad_thres}_sums.png')
-                plt.cla()
+                    plt.savefig(f'{path_plots}/{file_suffix}/{row[0][-5:]}_{binning}_{timestamp}_{reg}_{ind_quad_thres}_quads.png')
 
-                plt.close('all')
+                    plt.cla()
+
+                    fig, axarr = plt.subplots(2, sharex=True, figsize=(7, 9))
+                    fig.subplots_adjust(hspace=0.5)
+
+                    axarr[0].plot(t1_vetox, v1x, label='A', drawstyle='steps')
+                    axarr[0].plot(t2_vetox, v2x, label='B', drawstyle='steps')
+                    axarr[0].plot(t3_vetox, v3x, label='C', drawstyle='steps')
+                    axarr[0].plot(t4_vetox, v4x, label='D', drawstyle='steps')
+                    axarr[0].set_title('Veto')
+                    axarr[0].grid(True)
+                    axarr[0].set_ylabel(f'Veto Counts')
+                    axarr[0].legend()
+
+                    a_sum = np.sum(np.array([a1x,a2x,a3x,a4x]), axis=0)
+
+
+                    axarr[1].plot(timesx, a_sum)
+                    axarr[1].set_title('4 Quadrant Summed Bunch Data')
+                    axarr[1].set_ylabel(f'Bunch Counts')
+                    axarr[1].set_xlim(timestamp-reg, timestamp+reg)
+                    axarr[1].grid(True)
+
+                    plt.xlabel(f'Time(Binning = {binning})')
+                    plt.suptitle(f"4 quadrant Summed Bunch Data and Veto Quads Eyeballed Veto - Orbit {orbit}")
+
+
+                    plt.savefig(f'{path_plots}/{file_suffix}/{row[0][-5:]}_{binning}_{timestamp}_{reg}_{ind_quad_thres}_sums.png')
+                    plt.cla()
+
+                    plt.close('all')
 
 
 csv_file.close()

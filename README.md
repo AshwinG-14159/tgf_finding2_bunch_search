@@ -12,7 +12,9 @@ within plots, make folders histograms and scatter, along with other folders for 
 Use bunch_search_new.py for the searches
 
 
+Now, the mkf files present here are for orbits 418*, 419*, 429*, 430*. (Maybe a few more)
 
+We will use these to get data on the events.
 
 
 
