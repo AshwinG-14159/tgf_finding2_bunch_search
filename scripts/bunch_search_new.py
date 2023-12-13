@@ -108,7 +108,7 @@ print(start_text2)
 
 file_suffix = f"{my_type}_{ind_quad_thres}_{num_quads}_{binning}"
 
-csv_file = open(f"{path_results_csv}/{file_suffix}.csv")
+csv_file = open(f"{path_results_csv}/csv_results_{file_suffix}.csv","w")
 writer = csv.writer(csv_file)
 
 
