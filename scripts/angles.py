@@ -75,8 +75,8 @@ def txy(mkffile, trigtime, ra_tran, dec_tran):
         czn  = np.cos(azn.radian)
         phin = np.arctan2(cy,cx)
         phi_newn = phin*(u.rad.to(u.deg))
-        print("Theta of earth is:",azn.value)
-        print("Phi of Earth is:",phi_newn)
+        # print("Theta of earth is:",azn.value)
+        # print("Phi of Earth is:",phi_newn)
 
         try:
             for i,j in enumerate(phi_new):
@@ -97,7 +97,7 @@ def txy(mkffile, trigtime, ra_tran, dec_tran):
         print("CZTI might be in SAA. Please check using the script SAA_finder.py")
         raise SystemExit
 
-    return az.value, phi_new, thetax.to(u.deg).value, thetay.to(u.deg).value, minus_yaw, pitch, roll, transient, earth, earth_czti, earth_transient, earth_occult_angle.to(u.deg).value
+    return az.value, phi_new, thetax.to(u.deg).value, thetay.to(u.deg).value, minus_yaw, pitch, roll, transient, earth, earth_czti, earth_transient, earth_occult_angle.to(u.deg).value, phi_newn
 
 #------------------------------------------------------------------------
 

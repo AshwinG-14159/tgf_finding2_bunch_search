@@ -86,7 +86,7 @@ print('###########################################################')
 path_data = '/media/czti/CIFT PC Backup/event_and_bunch'
 path_mkfs = '../../big_data/mkfs'
 path_plots = '../../big_data/plots'
-path_results = '../../big_data/results_csv'
+path_results_csv = '../../big_data/results_csv'
 
 pattern_bunch = "*_bunch.fits"
 pattern_veto = "*_quad_clean.evt"
@@ -108,7 +108,8 @@ print(start_text2)
 
 file_suffix = f"{my_type}_{ind_quad_thres}_{num_quads}_{binning}"
 
-
+csv_file = open(f"{path_results_csv}/{file_suffix}.csv")
+writer = csv.writer(csv_file)
 
 
 for row in set_of_rows:
@@ -224,6 +225,8 @@ for row in set_of_rows:
         for timestamp in d:
             print(f"peak at {timestamp}")
             log(f"time - {d}")
+            written_to_csv = False
+
             for reg in reg_around_peak:
 
                 # Veto prep:
@@ -268,6 +271,32 @@ for row in set_of_rows:
                 print(f"will be plotted")
                 log(f"will be plotted")
 
+                if not written_to_csv:
+                    czti_time = timestamp
+                    with fits.open(mkf) as hdul:
+                        h = hdul[0].header
+                        ra_pnt = f'{h["RA_PNT"]}d'
+                        dec_pnt = f'{h["DEC_PNT"]}d'
+                
+                    try:
+                        ra_pnt = coo.Angle(ra_pnt)
+                    except u.UnitsError:
+                        ra_pnt = coo.Angle(ra_pnt, unit=u.deg)
+
+                    try:
+                        dec_pnt = coo.Angle(dec_pnt)
+                    except u.UnitsError:
+                        dec_pnt = coo.Angle(dec_pnt, unit=u.deg)
+
+
+                    transient_theta, transient_phi, transient_thetax, transient_thetay, coo_x, coo_y, coo_z, coo_transient, earth, earth_czti, earth_transient, earth_occult_angle, phi_newn = angles.txy(mkf, czti_time, ra_pnt.deg, dec_pnt.deg)
+                    
+                    row_to_write = [date, orbit, timestamp, earth_transient, phi_newn]
+                    writer.writerow(row_to_write)
+                    csv_file.flush()
+
+
+                
                 fig, axarr = plt.subplots(5, sharex=True, figsize=(7, 9))
                 fig.subplots_adjust(hspace=0.5)
 
@@ -346,7 +375,7 @@ for row in set_of_rows:
                 plt.close('all')
 
 
-
+csv_file.close()
 
 
 
